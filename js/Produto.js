@@ -42,3 +42,7 @@ class Produto {
         this.preco = ByteStream.readFloat(bytes, offset);
     }
 }
+
+if (typeof module !== "undefined" && module.exports) {
+    module.exports = Produto;
+}
