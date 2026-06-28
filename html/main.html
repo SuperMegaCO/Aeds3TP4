@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+    //Para clarificacao, a maioria does efeitos visuais foram adicionado como enfeite atraves de IA. A funcionalidade foi feita a mao (o display do vetor de bytes, a capacidade de highlighting), mas a animacao, as cores, a estilizacao
+    //foi adiocinada/modificados/integrados atraves de IA depois. 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -556,7 +558,6 @@
                 campo: null
             }));
 
-            // 1. Cabeçalho ID (0 a 3)
             for (let i = 0; i < 4; i++) {
                 metadadosBytes[i] = {
                     offset: i,
@@ -568,7 +569,6 @@
                 };
             }
 
-            // 2. Cabeçalho Lixo (4 a 11)
             for (let i = 4; i < 12; i++) {
                 metadadosBytes[i] = {
                     offset: i,
@@ -580,7 +580,6 @@
                 };
             }
 
-            // 3. Registros
             let pos = ArquivoVirtual.TAM_CABECALHO;
             while (pos < db.offset) {
                 const startOffset = pos;
@@ -634,7 +633,6 @@
                 };
                 pos += 1;
 
-                // Tamanho (2 bytes)
                 const tamOffsets = [pos, pos + 1];
                 for (let i = 0; i < 2; i++) {
                     metadadosBytes[pos + i] = {
@@ -668,7 +666,6 @@
                     }
                     pos += 4;
 
-                    // Nome (2 bytes tamanho + caracteres)
                     const stringLen = ByteStream.readShort(db.memoria, pos);
                     const nameOffsets = [];
                     for (let i = 0; i < 2 + stringLen; i++) {

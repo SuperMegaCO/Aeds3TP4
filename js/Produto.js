@@ -43,6 +43,3 @@ class Produto {
     }
 }
 
-if (typeof module !== "undefined" && module.exports) {
-    module.exports = Produto;
-}
