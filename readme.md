@@ -60,7 +60,226 @@ Estes metodos sao as traducoes das funcionalidades CRUD do Java para funcionar n
 - ![alt text](image-8.png)
 - ![alt text](image-9.png)
 ## Pagina Central
+Este trecho de script comeca o espelhamento do log interno para o console simulado que o usuario ver, para poder aparecer a reportagem de passo a passo. Tambem carrega os dados que ja existem no localstorage e atualiza a visualizacao. A funcao toHex tambem converte para 
+## Figura 11 - Inicializacao
+![alt text](image-10.png)
+Este metodo e o que faz possivel a capabilidade de so passar o mouse nas bytes para ver o que e. O jeito que funciona e que cria um dicionario para cada byte do arquivo, e ai vai assinando os metadados. O metodo instancia os dados temporariamente para poder processar as informacoes contidas. Este metodo e rodado quando tem qualquer mudanca no database, para atualizar a informacao. 
+## Bloco De Codigo 1 - atualizarMetadados
+```javascript
+function atualizarMetadados() {
+    metadadosBytes = new Array(db.memoria.length).fill(null).map((_, i) => ({
+        offset: i,
+        tipo: 'vazio',
+        descricao: `Byte vazio ou reserva de capacidade (offset ${i})`,
+        recordId: null,
+        campo: null
+    }));
 
+    for (let i = 0; i < 4; i++) {
+        metadadosBytes[i] = {
+            offset: i,
+            tipo: 'cabecalho-id',
+            descricao: `Último ID gerado e gravado no arquivo (${db.ultimoId})`,
+            recordId: null,
+            campo: 'header-id',
+            relatedOffsets: [0, 1, 2, 3]
+        };
+    }
+
+    for (let i = 4; i < 12; i++) {
+        metadadosBytes[i] = {
+            offset: i,
+            tipo: 'cabecalho-lixo',
+            descricao: `Início da lista de excluídos (Ponteiro de lixo: ${db.ponteiroLixo})`,
+            recordId: null,
+            campo: 'header-lixo',
+            relatedOffsets: [4, 5, 6, 7, 8, 9, 10, 11]
+        };
+    }
+
+    let pos = ArquivoVirtual.TAM_CABECALHO;
+    while (pos < db.offset) {
+        const startOffset = pos;
+        const lapide = ByteStream.readByte(db.memoria, pos);
+        const tamanho = ByteStream.readShort(db.memoria, pos + 1);
+        
+        let rId = null;
+        let pNome = "";
+        let pPreco = 0;
+        
+        if (lapide === 32) { // Ativo
+            rId = ByteStream.readInt(db.memoria, pos + 3);
+            try {
+                const payloadBytes = db.memoria.slice(pos + 3, pos + 3 + tamanho);
+                const tempProd = new Produto();
+                tempProd.fromByteArray(payloadBytes);
+                pNome = tempProd.nome;
+                pPreco = tempProd.preco;
+            } catch(e) {}
+        } else if (lapide === 42) { // Excluído
+            try {
+                rId = ByteStream.readInt(db.memoria, pos + 3);
+            } catch(e) {}
+        }
+        
+        const recordDescriptor = {
+            id: rId,
+            nome: pNome,
+            preco: pPreco,
+            status: lapide === 32 ? 'Ativo' : 'Excluído',
+            tamanho: tamanho,
+            startOffset: startOffset,
+            endOffset: startOffset + 3 + tamanho
+        };
+
+        const recordBytesRange = [];
+        for (let i = startOffset; i < startOffset + 3 + tamanho; i++) {
+            recordBytesRange.push(i);
+        }
+
+        // Lápide (1 byte)
+        metadadosBytes[pos] = {
+            offset: pos,
+            tipo: 'lapiside',
+            descricao: `Lápide: Indica se o registro está Ativo (0x20 / ' ') ou Excluído (0x2A / '*')`,
+            recordId: rId,
+            campo: 'lapide',
+            record: recordDescriptor,
+            relatedOffsets: [pos],
+            recordRange: recordBytesRange
+        };
+        pos += 1;
+
+        const tamOffsets = [pos, pos + 1];
+        for (let i = 0; i < 2; i++) {
+            metadadosBytes[pos + i] = {
+                offset: pos + i,
+                tipo: 'tamanho',
+                descricao: `Tamanho do Registro: Indica que o registro possui ${tamanho} bytes de payload de dados`,
+                recordId: rId,
+                campo: 'tamanho',
+                record: recordDescriptor,
+                relatedOffsets: tamOffsets,
+                recordRange: recordBytesRange
+            };
+        }
+        pos += 2;
+
+        const payloadStart = pos;
+        if (lapide === 32) {
+            // ID (4 bytes)
+            const idOffsets = [pos, pos + 1, pos + 2, pos + 3];
+            for (let i = 0; i < 4; i++) {
+                metadadosBytes[pos + i] = {
+                    offset: pos + i,
+                    tipo: 'id',
+                    descricao: `Campo 'ID': Identificador do Produto (${rId})`,
+                    recordId: rId,
+                    campo: 'id',
+                    record: recordDescriptor,
+                    relatedOffsets: idOffsets,
+                    recordRange: recordBytesRange
+                };
+            }
+            pos += 4;
+
+            const stringLen = ByteStream.readShort(db.memoria, pos);
+            const nameOffsets = [];
+            for (let i = 0; i < 2 + stringLen; i++) {
+                nameOffsets.push(pos + i);
+            }
+
+            for (let i = 0; i < 2; i++) {
+                metadadosBytes[pos + i] = {
+                    offset: pos + i,
+                    tipo: 'nome',
+                    descricao: `Comprimento da string do Nome: ${stringLen} bytes de caracteres UTF-8`,
+                    recordId: rId,
+                    campo: 'nome',
+                    record: recordDescriptor,
+                    relatedOffsets: nameOffsets,
+                    recordRange: recordBytesRange
+                };
+            }
+            pos += 2;
+
+            for (let i = 0; i < stringLen; i++) {
+                const charByte = db.memoria[pos];
+                const char = String.fromCharCode(charByte);
+                metadadosBytes[pos] = {
+                    offset: pos,
+                    tipo: 'nome',
+                    descricao: `Campo 'Nome': caractere '${char}'`,
+                    recordId: rId,
+                    campo: 'nome',
+                    record: recordDescriptor,
+                    relatedOffsets: nameOffsets,
+                    recordRange: recordBytesRange
+                };
+                pos += 1;
+            }
+
+            // Preço (4 bytes float)
+            const precoOffsets = [pos, pos + 1, pos + 2, pos + 3];
+            for (let i = 0; i < 4; i++) {
+                metadadosBytes[pos + i] = {
+                    offset: pos + i,
+                    tipo: 'preco',
+                    descricao: `Campo 'Preço': valor R$ ${pPreco.toFixed(2)} em formato Float (4 bytes)`,
+                    recordId: rId,
+                    campo: 'preco',
+                    record: recordDescriptor,
+                    relatedOffsets: precoOffsets,
+                    recordRange: recordBytesRange
+                };
+            }
+            pos += 4;
+        } else {
+            // Excluído: os 8 primeiros bytes de payload são o ponteiro para o próximo lixo
+            const nextPointer = ByteStream.readLong(db.memoria, pos);
+            const pointerOffsets = [];
+            for (let i = 0; i < 8; i++) {
+                pointerOffsets.push(pos + i);
+            }
+
+            for (let i = 0; i < 8; i++) {
+                metadadosBytes[pos + i] = {
+                    offset: pos + i,
+                    tipo: 'ponteiro-excluido',
+                    descricao: `Ponteiro Lixo: Endereço do próximo espaço vazio na lista ligada (${nextPointer}n)`,
+                    recordId: rId,
+                    campo: 'ponteiro-lixo',
+                    record: recordDescriptor,
+                    relatedOffsets: pointerOffsets,
+                    recordRange: recordBytesRange
+                };
+            }
+            pos += 8;
+
+            // Resto do espaço é lixo desperdiçado (fragmentação interna)
+            const payloadResto = tamanho - 8;
+            const restoOffsets = [];
+            for (let i = 0; i < payloadResto; i++) {
+                restoOffsets.push(pos + i);
+            }
+
+            for (let i = 0; i < payloadResto; i++) {
+                metadadosBytes[pos + i] = {
+                    offset: pos + i,
+                    tipo: 'lixo-desperdicado',
+                    descricao: `Lixo Desperdiçado: Fragmentação interna (sobras não utilizadas de espaço excluído)`,
+                    recordId: rId,
+                    campo: 'lixo-desperdicado',
+                    record: recordDescriptor,
+                    relatedOffsets: restoOffsets,
+                    recordRange: recordBytesRange
+                };
+                pos += 1;
+            }
+        }
+    }
+}
+```
 ## CHECKLIST?
 
 - [x] O índice invertido com os termos dos nomes dos cursos foi criado usando a classe ListaInvertida? *SIM*
