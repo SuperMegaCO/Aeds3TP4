@@ -282,9 +282,9 @@ function atualizarMetadados() {
 ```
 ## CHECKLIST?
 
-- [x] O índice invertido com os termos dos nomes dos cursos foi criado usando a classe ListaInvertida? *SIM*
-- [x] É possível buscar cursos por palavras no menu de inscrição? *SIM*
-- [x] O trabalho compila corretamente? *SIM*
+- [x] A página web com a visualização interativa do CRUD de produtos foi criada? *SIM*
+- [x] Há um vídeo de até 3 minutos demonstrando o uso da visualização? *SIM*
+- [x] O trabalho foi criado apenas com HTML, CSS e JS? *SIM*
 - [x] O trabalho está completo e funcionando sem erros de execução? *SIM*
 - [x] O trabalho é original e não a cópia de um trabalho de outro grupo? *SIM*
 
